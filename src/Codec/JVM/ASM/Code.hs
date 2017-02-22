@@ -270,6 +270,12 @@ if_icmple = intBranch2 OP.if_icmple
 if_acmpeq = binaryBranch jobject OP.if_acmpeq
 if_acmpne = binaryBranch jobject OP.if_acmpne
 
+gthrow :: FieldType -> Code
+gthrow ft = mkCode' $
+     IT.op OP.athrow
+  <> modifyStack ( CF.push ft
+                 . CF.pop  ft )
+
 -- Generic instruction which selects either
 -- the original opcode or the modified opcode
 -- based on size
@@ -281,6 +287,18 @@ gwide opcode n = wideInstr
           | otherwise = IT.op OP.wide
                      <> IT.op opcode
                      <> IT.bytes (packI16 $ fromIntegral n)
+
+ginstanceof :: FieldType -> Code
+ginstanceof ft@(ObjectType (IClassName className )) =
+  mkCode cs $
+       IT.op OP.instanceof
+    <> IT.ix c
+    <> modifyStack ( CF.push jint
+                   . CF.pop  ft   )
+  where c  = CClass . IClassName $ className
+        cs = CP.unpack c
+
+ginstanceof _ = error "we don't support non-object types with instanceof"
 
 -- Generic load instruction
 gload :: FieldType -> Int -> Code
@@ -653,6 +671,15 @@ swap ft1 ft2 =
   mkCode' $
      IT.op OP.swap
   <> modifyStack ( CF.push ft1
+                 . CF.push ft2
+                 . CF.pop  ft1
+                 . CF.pop  ft2)
+dup_x1 :: FieldType -> FieldType -> Code
+dup_x1 ft1 ft2 =
+  mkCode' $
+    IT.op OP.dup_x1
+  <> modifyStack ( CF.push ft2
+                 . CF.push ft1
                  . CF.push ft2
                  . CF.pop  ft1
                  . CF.pop  ft2)
