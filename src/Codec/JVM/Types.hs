@@ -182,7 +182,7 @@ ret = Just
 
 -- | Method descriptor
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.3.3
-data MethodDesc = MethodDesc Text
+newtype MethodDesc = MethodDesc Text
   deriving (Eq, Ord, Show)
 
 mkMethodDesc :: [FieldType] -> ReturnType -> MethodDesc
@@ -214,6 +214,8 @@ decodeMethodDesc desc
           | Text.null text = Just $ reverse fts
           | Just (ft, rest') <- decodeDesc text = argTypes rest' (ft:fts)
           | otherwise = Nothing
+
+data FormalTypeParameter = FormalTypeParameter Text FieldType [FieldType]
 
 -- | Field or method reference
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.4.2

@@ -38,13 +38,13 @@ import Data.Binary.Put (runPut)
 import Data.Foldable (fold)
 import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe, maybeToList)
-import Data.Text (Text, split)
+import Data.Text (Text, intercalate, split)
 
 import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 
 import Codec.JVM.ASM.Code (Code, vreturn, invokespecial, dup, gload)
-import Codec.JVM.Attr (toAttrs, attrName, innerClassInfo, unpackAttr, Attr(AInnerClasses))
+import Codec.JVM.Attr (toAttrs, attrName, innerClassInfo, unpackAttr, Attr(AInnerClasses, ASignature))
 import Codec.JVM.Class (ClassFile(..))
 import Codec.JVM.Const (Const(..))
 import Codec.JVM.ConstPool (mkConstPool)
@@ -82,14 +82,14 @@ mkClassFile v afs tc' sc' is' fds mds = ClassFile cs v (Set.fromList afs) tc sc 
       attrs =  Map.fromList . map (\attr -> (attrName attr, attr)) $ attrs'
       cs = cs'' ++ cs' ++ acs
       mis = f <$> mds where
-        f (MethodDef afs' n' (MethodDesc d) code) =
-          MethodInfo (Set.fromList afs') n' (Desc d) code
+        f (MethodDef as afs' n' (MethodDesc d) code) =
+          MethodInfo as (Set.fromList afs') n' (Desc d) code
 
       fis = f <$> fds where
         f (FieldDef afs' n' (FieldDesc d)) =
           FieldInfo (Set.fromList afs') n' (Desc d) []
 
-data MethodDef = MethodDef [AccessFlag] UName MethodDesc Code
+data MethodDef = MethodDef [Attr] [AccessFlag] UName MethodDesc Code
   deriving Show
 
 mkMethodDef :: Text -> [AccessFlag] -> Text -> [FieldType] -> ReturnType -> Code -> MethodDef
@@ -97,10 +97,21 @@ mkMethodDef cls afs n fts rt cs = mkMethodDef' afs n (mkMethodDesc fts rt) code
   where code = Code.initCtrlFlow (Static `elem` afs) ((obj cls) : fts) <> cs
 
 mkMethodDef' :: [AccessFlag] -> Text -> MethodDesc -> Code -> MethodDef
-mkMethodDef' afs n md c = MethodDef afs (UName n) md c
+mkMethodDef' afs n md c = MethodDef [] afs (UName n) md c
+
+addAttrsToMethodDef :: [Attr] -> MethodDef -> MethodDef
+addAttrsToMethodDef as (MethodDef as' afs n md cs) = MethodDef (as ++ as') afs n md cs
+
+addFormals :: [FormalTypeParameter] -> MethodDef -> MethodDef
+addFormals ftps m@(MethodDef _ _ _ (MethodDesc desc) _) =
+  addAttrsToMethodDef [ASignature $ formals <> desc] m
+  where formals = "<" <> foldMap bounded ftps <> ">"
+        bounded (FormalTypeParameter n cbs ibs) = n <> ":" <> intercalate ":" (map mkFieldDesc' (cbs:ibs))
 
 unpackMethodDef :: MethodDef -> [Const]
-unpackMethodDef (MethodDef _ (UName n') (MethodDesc d) code) = CUTF8 n':CUTF8 d:Code.consts code
+unpackMethodDef (MethodDef as _ (UName n') (MethodDesc d) code) = CUTF8 n':CUTF8 d:code' ++ as'
+  where as' = concatMap unpackAttr as
+        code' = Code.consts code
 
 data FieldDef = FieldDef [AccessFlag] UName FieldDesc
   deriving Show
