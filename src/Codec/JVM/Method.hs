@@ -14,7 +14,8 @@ import Codec.JVM.Types
 -- https://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.6
 
 data MethodInfo = MethodInfo
-  { accessFlags :: Set AccessFlag
+  { attrs :: [Attr]
+  , accessFlags :: Set AccessFlag
   , name :: UName
   , descriptor :: Desc
   , bytecode :: Code }
@@ -33,4 +34,4 @@ putMethodInfo cp mi = do
   case descriptor mi of Desc d  -> putIx cp $ CUTF8 d
   putI16 . L.length $ attributes
   mapM_ (putAttr cp) attributes
-  where attributes = toAttrs cp (bytecode mi)
+  where attributes = toAttrs cp (bytecode mi) ++ attrs mi

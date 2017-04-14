@@ -35,6 +35,7 @@ data Attr
     , codeAttrs :: [Attr] }
   | AStackMapTable [(Offset, StackMapFrame)]
   | AInnerClasses InnerClassMap
+  | ASignature Text
 
 newtype InnerClassMap = InnerClassMap (Map Text InnerClass)
   deriving (Eq, Show)
@@ -56,9 +57,11 @@ attrName :: Attr -> Text
 attrName (ACode _ _ _ _)    = "Code"
 attrName (AStackMapTable _) = "StackMapTable"
 attrName (AInnerClasses _)  = "InnerClasses"
+attrName (ASignature _) = "Signature"
 
 unpackAttr :: Attr -> [Const]
 unpackAttr attr@(ACode _ _ _ xs) = (CUTF8 $ attrName attr):(unpackAttr =<< xs)
+unpackAttr attr@(ASignature t) = [CUTF8 . attrName $ attr, CUTF8 t]
 unpackAttr attr = return . CUTF8 . attrName $ attr
 
 putAttr :: ConstPool -> Attr -> Put
@@ -84,8 +87,8 @@ putAttrBody cp (AInnerClasses innerClassMap) = do
   putI16 $ length ics
   mapM_ (putInnerClass cp) ics
   where ics = innerClassElems innerClassMap
-putAttrBody cp attr = error $ "putAttrBody: Attribute not supported!\n"
-                   ++ show attr
+putAttrBody cp (ASignature t) =
+  putIx cp $ CUTF8 t
 
 -- | http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.4
 --
