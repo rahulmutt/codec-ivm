@@ -32,7 +32,8 @@ data InstrState =
              , isLabelTable    :: LabelTable
              , isLastBranch    :: LastBranch
              , isRunAgain      :: Bool
-             , isNextLabel     :: Int }
+             , isNextLabel     :: Int 
+             , isLineNumber    :: Maybe Int }
 
 newtype InstrM a = InstrM { runInstrM :: ConstPool -> InstrState -> (# a, InstrState #) }
 
@@ -90,10 +91,14 @@ emptyInstrState =
              , isLabelTable = mempty
              , isLastBranch = NoBranch
              , isRunAgain = False
-             , isNextLabel = 1 }
+             , isNextLabel = 1
+             , isLineNumber = Nothing }
 
 getBCS :: InstrState -> (ByteString, CtrlFlow, StackMapTable)
 getBCS InstrState{..} = (isByteCode, isCtrlFlow, isStackMapTable)
+
+getBCSL :: InstrState -> (ByteString, CtrlFlow, StackMapTable, Maybe Int)
+getBCSL InstrState{..} = (isByteCode, isCtrlFlow, isStackMapTable, isLineNumber)
 
 runInstr :: Instr -> ConstPool -> InstrState
 runInstr instr cp = multiPass 0 emptyInstrState { isRunAgain = True }

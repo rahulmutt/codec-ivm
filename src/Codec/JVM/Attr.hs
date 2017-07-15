@@ -46,11 +46,15 @@ data Attr
     , codeAttrs :: [Attr] }
   | AStackMapTable [(Offset, StackMapFrame)]
   | AInnerClasses InnerClassMap
+  | ASignature (Signature TypeVariable)
   | AConstantValue Text
   | AMethodParam [MParameter]
-  | ASignature (Signature TypeVariable)
-
+  | ALineNumberTable [(Offset,LineNumber)]
+  | ASourceFile Text
 ------------------------Signatures------------------------------------
+
+type LineNumber = Int
+
 type TypeVariable = Text
 
 data Signature a = ClassSig  (ClassSignature a)
@@ -219,12 +223,14 @@ instance Show Attr where
   show attr = "A" ++ (T.unpack $ attrName attr)
 
 attrName :: Attr -> Text
-attrName (ACode _ _ _ _)    = "Code"
-attrName (AStackMapTable _) = "StackMapTable"
-attrName (AInnerClasses _)  = "InnerClasses"
-attrName (ASignature _)     = "Signature"
-attrName (AConstantValue _) = "ConstantValue"
-attrName (AMethodParam _)   = "MethodParameters"
+attrName (ACode _ _ _ _)      = "Code"
+attrName (AStackMapTable _)   = "StackMapTable"
+attrName (AInnerClasses _)    = "InnerClasses"
+attrName (ASignature _)       = "Signature"
+attrName (AConstantValue _)   = "ConstantValue"
+attrName (AMethodParam _)     = "MethodParameters"
+attrName (ALineNumberTable _) = "LineNumberTable"
+attrName (ASourceFile _)      = "SourceFile" 
 
 unpackAttr :: Attr -> [Const]
 unpackAttr attr = CUTF8 (attrName attr) : restAttributes
@@ -232,6 +238,7 @@ unpackAttr attr = CUTF8 (attrName attr) : restAttributes
           case attr of
             ACode _ _ _ xs -> concatMap unpackAttr xs
             ASignature sig -> [CUTF8 $ generateSignature sig]
+            ASourceFile f  -> [CUTF8 $ f]
             _              -> []
 
 putAttr :: String -> Maybe Int -> ConstPool -> Attr -> Put
@@ -268,6 +275,12 @@ putAttrBody debug mCodeSize cp attr =
         $ CUTF8 $ generateSignature signature
     AConstantValue _ -> error "putAttrBody: ConstantValue attribute not implemented!"
     AMethodParam   _ -> error "putAttrBody: MethodParameter attribute not implemented!"
+    ALineNumberTable ls ->
+      mapM_  (\(Offset pc,ln) -> putI16 pc >> putI16 ln) ls
+    ASourceFile fileName ->
+      putIx ("putAttrBody[SourceFile][" ++ debug ++ "]") cp
+        $ CUTF8 $ fileName
+    _ -> error $ "putAttrBody: Attribute not supported!\n" ++ show attr
 
 -- | http://docs.oracle.com/javase/specs/jvms/se8/html/jvms-4.html#jvms-4.7.4
 --
