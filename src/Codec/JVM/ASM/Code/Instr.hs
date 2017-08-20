@@ -25,15 +25,15 @@ import qualified Codec.JVM.ConstPool as CP
 import qualified Codec.JVM.Opcode as OP
 
 data InstrState =
-  InstrState { isByteCode      :: !ByteString
-             , isStackMapTable :: StackMapTable
-             , isOffset        :: !Offset
-             , isCtrlFlow      :: CtrlFlow
-             , isLabelTable    :: LabelTable
-             , isLastBranch    :: LastBranch
-             , isRunAgain      :: Bool
-             , isNextLabel     :: Int 
-             , isLineNumber    :: Maybe Int }
+  InstrState { isByteCode        :: !ByteString
+             , isStackMapTable   :: StackMapTable
+             , isOffset          :: !Offset
+             , isCtrlFlow        :: CtrlFlow
+             , isLabelTable      :: LabelTable
+             , isLastBranch      :: LastBranch
+             , isRunAgain        :: Bool
+             , isNextLabel       :: Int 
+             , isLineNumberTable :: LineNumberTable }
 
 newtype InstrM a = InstrM { runInstrM :: ConstPool -> InstrState -> (# a, InstrState #) }
 
@@ -92,13 +92,13 @@ emptyInstrState =
              , isLastBranch = NoBranch
              , isRunAgain = False
              , isNextLabel = 1
-             , isLineNumber = Nothing }
+             , isLineNumberTable = mempty }
 
 getBCS :: InstrState -> (ByteString, CtrlFlow, StackMapTable)
 getBCS InstrState{..} = (isByteCode, isCtrlFlow, isStackMapTable)
 
-getBCSL :: InstrState -> (ByteString, CtrlFlow, StackMapTable, Maybe Int)
-getBCSL InstrState{..} = (isByteCode, isCtrlFlow, isStackMapTable, isLineNumber)
+getBCSL :: InstrState -> (ByteString, CtrlFlow, StackMapTable, LineNumberTable)
+getBCSL InstrState{..} = (isByteCode, isCtrlFlow, isStackMapTable, isLineNumberTable)
 
 runInstr :: Instr -> ConstPool -> InstrState
 runInstr instr cp = multiPass 0 emptyInstrState { isRunAgain = True }
@@ -112,16 +112,29 @@ runInstr instr cp = multiPass 0 emptyInstrState { isRunAgain = True }
 runInstrBCS :: Instr -> ConstPool -> (ByteString, CtrlFlow, StackMapTable)
 runInstrBCS instr cp = getBCS $ runInstr instr cp
 
+runInstrBCSL :: Instr -> ConstPool -> (ByteString, CtrlFlow, StackMapTable, LineNumberTable)
+runInstrBCSL instr cp = getBCSL $ runInstr instr cp
+
 runInstr' :: Instr -> ConstPool -> InstrState -> InstrState
 runInstr' (Instr m) e s = case runInstrM m e s of (# _, s' #) -> s'
 
 runInstrBCS' :: Instr -> ConstPool -> InstrState -> (ByteString, CtrlFlow, StackMapTable)
 runInstrBCS' instr e s = getBCS $ runInstr' instr e s
 
+runInstrBCSL' :: Instr -> ConstPool -> InstrState ->
+                 (ByteString, CtrlFlow, StackMapTable, LineNumberTable)
+runInstrBCSL' instr e s = getBCSL $ runInstr' instr e s
+
 recordBranch :: BranchType -> InstrM ()
 recordBranch bt = do
   off <- getOffset
   modify' $ \s -> s { isLastBranch = HasBranch bt (Offset off) }
+
+recordLineNumber :: LineNumber -> InstrM ()
+recordLineNumber ln = do
+  off <- getOffset
+  modify' $ \s@InstrState { isLineNumberTable = lnt } ->
+              s { isLineNumberTable = insertLNT (Offset off) ln lnt } 
 
 gotoInstr :: Special -> InstrM ()
 gotoInstr = gotoInstrSpec OP.goto
@@ -208,8 +221,8 @@ initCtrl :: (CtrlFlow -> CtrlFlow) -> Instr
 initCtrl f = Instr $ do
   unInstr $ ctrlFlow f
   modify' $ \s@InstrState { isCtrlFlow = cf
-                          , isStackMapTable = StackMapTable smfs } ->
-    s { isStackMapTable = StackMapTable $ IntMap.insert (-1) cf smfs }
+                          , isStackMapTable = smt } ->
+    s { isStackMapTable = insertSMT (-1) cf smt }
   -- NOTE: The (-1) is done as a special case for when a stack map frame has to
   --       be generated for offset 0.
 

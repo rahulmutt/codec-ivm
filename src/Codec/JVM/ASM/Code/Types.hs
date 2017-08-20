@@ -31,6 +31,22 @@ instance Monoid StackMapTable where
 insertSMT :: Int -> CtrlFlow -> StackMapTable -> StackMapTable
 insertSMT k v (StackMapTable sm) = StackMapTable $ IntMap.insert k v sm
 
+newtype LineNumber = LineNumber Int
+
+newtype LineNumberTable = LineNumberTable (IntMap LineNumber)
+
+instance Monoid LineNumberTable where
+  mempty = LineNumberTable mempty
+  mappend (LineNumberTable x) (LineNumberTable y)
+    = LineNumberTable $ union' x y
+
+fromListLNT :: LineNumberTable -> [(Offset,LineNumber)]
+fromListLNT (LineNumberTable m) = map (\(off,ln) -> (Offset off,ln)) $ IntMap.assocs m
+
+insertLNT :: Offset -> LineNumber -> LineNumberTable -> LineNumberTable
+insertLNT (Offset off) ln (LineNumberTable lnt) =
+  LineNumberTable $ IntMap.insert off ln lnt
+
 newtype LabelTable = LabelTable { unLabelTable :: IntMap Offset }
   deriving Show
 

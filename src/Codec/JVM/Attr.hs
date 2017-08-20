@@ -20,8 +20,10 @@ import qualified Data.Text as T
 import Codec.JVM.ASM.Code.CtrlFlow
 import qualified Codec.JVM.ASM.Code.CtrlFlow as CF
 import Codec.JVM.ASM.Code (Code(..))
-import Codec.JVM.ASM.Code.Instr (runInstrBCS)
-import Codec.JVM.ASM.Code.Types (Offset(..), StackMapTable(..))
+import Codec.JVM.ASM.Code.Instr (runInstrBCS, )
+import Codec.JVM.ASM.Code.Types (Offset(..), StackMapTable(..),
+                                 LineNumber(..), LineNumberTable(..),
+                                 fromListLNT)
 import Codec.JVM.Const (Const(..), constTag)
 import Codec.JVM.ConstPool (ConstPool, putIx, unpack)
 import Codec.JVM.Internal
@@ -49,11 +51,9 @@ data Attr
   | ASignature (Signature TypeVariable)
   | AConstantValue Text
   | AMethodParam [MParameter]
-  | ALineNumberTable [(Offset,LineNumber)]
+  | ALineNumberTable LineNumberTable
   | ASourceFile Text
 ------------------------Signatures------------------------------------
-
-type LineNumber = Int
 
 type TypeVariable = Text
 
@@ -276,7 +276,7 @@ putAttrBody debug mCodeSize cp attr =
     AConstantValue _ -> error "putAttrBody: ConstantValue attribute not implemented!"
     AMethodParam   _ -> error "putAttrBody: MethodParameter attribute not implemented!"
     ALineNumberTable ls ->
-      mapM_  (\(Offset pc,ln) -> putI16 pc >> putI16 ln) ls
+      mapM_  (\(Offset pc, LineNumber ln) -> putI16 pc >> putI16 ln) $ fromListLNT ls
     ASourceFile fileName ->
       putIx ("putAttrBody[SourceFile][" ++ debug ++ "]") cp
         $ CUTF8 $ fileName
@@ -338,10 +338,10 @@ putStackMapFrames debug mCodeSize cp xs = (numFrames, putFrames)
 toAttrs :: ConstPool -> Code -> [Attr]
 toAttrs cp code = [ACode maxStack' maxLocals' xs attrs]
   where (xs, cf, smt) = runInstrBCS (instr code) cp
-        maxLocals'    = CF.maxLocals cf
-        maxStack'     = CF.maxStack cf
-        attrs         = if null frames then [] else [AStackMapTable frames]
-        frames        = toStackMapFrames smt
+        maxLocals'         = CF.maxLocals cf
+        maxStack'          = CF.maxStack cf
+        attrs              = if null frames then [] else [AStackMapTable frames]
+        frames             = toStackMapFrames smt
 
 toStackMapFrames :: StackMapTable -> [(Offset, StackMapFrame)]
 toStackMapFrames (StackMapTable smt)
