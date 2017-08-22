@@ -32,11 +32,13 @@ insertSMT :: Int -> CtrlFlow -> StackMapTable -> StackMapTable
 insertSMT k v (StackMapTable sm) = StackMapTable $ IntMap.insert k v sm
 
 newtype LineNumber = LineNumber Int
+  deriving (Show, Eq)
 
 mkLineNumber :: Int -> LineNumber
 mkLineNumber = LineNumber
 
 newtype LineNumberTable = LineNumberTable (IntMap LineNumber)
+  deriving (Show, Eq)
 
 instance Monoid LineNumberTable where
   mempty = LineNumberTable mempty

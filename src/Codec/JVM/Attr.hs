@@ -238,8 +238,7 @@ unpackAttr attr = CUTF8 (attrName attr) : restAttributes
           case attr of
             ACode _ _ _ xs       -> concatMap unpackAttr xs
             ASignature sig       -> [CUTF8 $ generateSignature sig]
-            ASourceFile f        -> [CUTF8 $ attrName attr, CUTF8 $ f]
-            ALineNumberTable lnt -> [CUTF8 $ attrName attr] 
+            ASourceFile f        -> [CUTF8 $ f]
             _                    -> []
 
 putAttr :: String -> Maybe Int -> ConstPool -> Attr -> Put
@@ -276,8 +275,10 @@ putAttrBody debug mCodeSize cp attr =
         $ CUTF8 $ generateSignature signature
     AConstantValue _ -> error "putAttrBody: ConstantValue attribute not implemented!"
     AMethodParam   _ -> error "putAttrBody: MethodParameter attribute not implemented!"
-    ALineNumberTable ls ->
-      mapM_  (\(Offset pc, LineNumber ln) -> putI16 pc >> putI16 ln) $ toListLNT ls
+    ALineNumberTable lnt -> do
+      let lns = toListLNT lnt
+      putI16 $ length lns
+      mapM_ (\(Offset pc, LineNumber ln) -> putI16 pc >> putI16 ln) lns
     ASourceFile fileName ->
       putIx ("putAttrBody[SourceFile][" ++ debug ++ "]") cp
         $ CUTF8 $ fileName
@@ -337,13 +338,14 @@ putStackMapFrames debug mCodeSize cp xs = (numFrames, putFrames)
                   traverse_ (putVerifTy ("FullFrame[stack[" ++ show stack ++ "]]")) stack
 
 toAttrs :: ConstPool -> Code -> [Attr]
-toAttrs cp code = [ACode maxStack' maxLocals' xs attrs, ALineNumberTable lnt]
+toAttrs cp code = [ACode maxStack' maxLocals' xs attrs']
   where (xs, cf, smt, lnt) = runInstrBCSL (instr code) cp
         maxLocals'         = CF.maxLocals cf
         maxStack'          = CF.maxStack cf
         attrs              = if null frames then [] else [AStackMapTable frames]
         frames             = toStackMapFrames smt
-
+        attrs' = (if lnt == mempty then [] else [ALineNumberTable lnt]) ++ attrs
+        
 toStackMapFrames :: StackMapTable -> [(Offset, StackMapFrame)]
 toStackMapFrames (StackMapTable smt)
   = reverse . fst $ foldl' f ([], c) cfs

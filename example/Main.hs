@@ -26,7 +26,6 @@ classFile = mkClassFile java7 [Public, Super] mainClass Nothing [] []
      <> iconst jint 1
      <> iadd
      <> ifeq (goto loop) mempty
-     <> emitLineNumber (ln 6)
      <> vreturn
   ]
   where loop = mkLabel 1
