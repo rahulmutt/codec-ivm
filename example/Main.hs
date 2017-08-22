@@ -21,13 +21,16 @@ classFile = mkClassFile java7 [Public, Super] mainClass Nothing [] []
     mkMethodDef mainClass [Public, Static] "main" [jarray jstring] void $
         startLabel loop
      <> markStackMap
+     <> emitLineNumber (ln 5)  
      <> iconst jint 1
      <> iconst jint 1
      <> iadd
      <> ifeq (goto loop) mempty
+     <> emitLineNumber (ln 6)
      <> vreturn
   ]
   where loop = mkLabel 1
+        ln = mkLineNumber
 
 dumpStackMap :: Code -> IO ()
 dumpStackMap (Code consts instr) = do

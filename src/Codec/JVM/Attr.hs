@@ -20,10 +20,10 @@ import qualified Data.Text as T
 import Codec.JVM.ASM.Code.CtrlFlow
 import qualified Codec.JVM.ASM.Code.CtrlFlow as CF
 import Codec.JVM.ASM.Code (Code(..))
-import Codec.JVM.ASM.Code.Instr (runInstrBCS, )
+import Codec.JVM.ASM.Code.Instr (runInstrBCSL)
 import Codec.JVM.ASM.Code.Types (Offset(..), StackMapTable(..),
                                  LineNumber(..), LineNumberTable(..),
-                                 fromListLNT)
+                                 toListLNT)
 import Codec.JVM.Const (Const(..), constTag)
 import Codec.JVM.ConstPool (ConstPool, putIx, unpack)
 import Codec.JVM.Internal
@@ -236,10 +236,11 @@ unpackAttr :: Attr -> [Const]
 unpackAttr attr = CUTF8 (attrName attr) : restAttributes
   where restAttributes =
           case attr of
-            ACode _ _ _ xs -> concatMap unpackAttr xs
-            ASignature sig -> [CUTF8 $ generateSignature sig]
-            ASourceFile f  -> [CUTF8 $ f]
-            _              -> []
+            ACode _ _ _ xs       -> concatMap unpackAttr xs
+            ASignature sig       -> [CUTF8 $ generateSignature sig]
+            ASourceFile f        -> [CUTF8 $ attrName attr, CUTF8 $ f]
+            ALineNumberTable lnt -> [CUTF8 $ attrName attr] 
+            _                    -> []
 
 putAttr :: String -> Maybe Int -> ConstPool -> Attr -> Put
 putAttr debug mCodeSize cp attr = do
@@ -276,7 +277,7 @@ putAttrBody debug mCodeSize cp attr =
     AConstantValue _ -> error "putAttrBody: ConstantValue attribute not implemented!"
     AMethodParam   _ -> error "putAttrBody: MethodParameter attribute not implemented!"
     ALineNumberTable ls ->
-      mapM_  (\(Offset pc, LineNumber ln) -> putI16 pc >> putI16 ln) $ fromListLNT ls
+      mapM_  (\(Offset pc, LineNumber ln) -> putI16 pc >> putI16 ln) $ toListLNT ls
     ASourceFile fileName ->
       putIx ("putAttrBody[SourceFile][" ++ debug ++ "]") cp
         $ CUTF8 $ fileName
@@ -336,8 +337,8 @@ putStackMapFrames debug mCodeSize cp xs = (numFrames, putFrames)
                   traverse_ (putVerifTy ("FullFrame[stack[" ++ show stack ++ "]]")) stack
 
 toAttrs :: ConstPool -> Code -> [Attr]
-toAttrs cp code = [ACode maxStack' maxLocals' xs attrs]
-  where (xs, cf, smt) = runInstrBCS (instr code) cp
+toAttrs cp code = [ACode maxStack' maxLocals' xs attrs, ALineNumberTable lnt]
+  where (xs, cf, smt, lnt) = runInstrBCSL (instr code) cp
         maxLocals'         = CF.maxLocals cf
         maxStack'          = CF.maxStack cf
         attrs              = if null frames then [] else [AStackMapTable frames]

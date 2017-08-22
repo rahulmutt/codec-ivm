@@ -33,6 +33,9 @@ insertSMT k v (StackMapTable sm) = StackMapTable $ IntMap.insert k v sm
 
 newtype LineNumber = LineNumber Int
 
+mkLineNumber :: Int -> LineNumber
+mkLineNumber = LineNumber
+
 newtype LineNumberTable = LineNumberTable (IntMap LineNumber)
 
 instance Monoid LineNumberTable where
@@ -40,8 +43,8 @@ instance Monoid LineNumberTable where
   mappend (LineNumberTable x) (LineNumberTable y)
     = LineNumberTable $ union' x y
 
-fromListLNT :: LineNumberTable -> [(Offset,LineNumber)]
-fromListLNT (LineNumberTable m) = map (\(off,ln) -> (Offset off,ln)) $ IntMap.assocs m
+toListLNT :: LineNumberTable -> [(Offset,LineNumber)]
+toListLNT (LineNumberTable m) = map (\(off,ln) -> (Offset off,ln)) $ IntMap.assocs m
 
 insertLNT :: Offset -> LineNumber -> LineNumberTable -> LineNumberTable
 insertLNT (Offset off) ln (LineNumberTable lnt) =

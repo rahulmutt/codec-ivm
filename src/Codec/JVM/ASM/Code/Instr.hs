@@ -130,11 +130,14 @@ recordBranch bt = do
   off <- getOffset
   modify' $ \s -> s { isLastBranch = HasBranch bt (Offset off) }
 
-recordLineNumber :: LineNumber -> InstrM ()
-recordLineNumber ln = do
+recordLineNumber' :: LineNumber -> InstrM ()
+recordLineNumber' ln = do
   off <- getOffset
   modify' $ \s@InstrState { isLineNumberTable = lnt } ->
               s { isLineNumberTable = insertLNT (Offset off) ln lnt } 
+
+recordLineNumber :: LineNumber -> Instr
+recordLineNumber = Instr . recordLineNumber'
 
 gotoInstr :: Special -> InstrM ()
 gotoInstr = gotoInstrSpec OP.goto

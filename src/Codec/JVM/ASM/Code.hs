@@ -717,3 +717,5 @@ arraylength ft =
      IT.op OP.arraylength
   <> modifyStack ( CF.push jint . CF.pop ft )
 
+emitLineNumber :: LineNumber -> Code
+emitLineNumber = mkCode' . IT.recordLineNumber 
