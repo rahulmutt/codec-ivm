@@ -236,10 +236,10 @@ unpackAttr :: Attr -> [Const]
 unpackAttr attr = CUTF8 (attrName attr) : restAttributes
   where restAttributes =
           case attr of
-            ACode _ _ _ xs       -> concatMap unpackAttr xs
-            ASignature sig       -> [CUTF8 $ generateSignature sig]
-            ASourceFile f        -> [CUTF8 $ f]
-            _                    -> []
+            ACode _ _ _ xs -> concatMap unpackAttr xs
+            ASignature sig -> [CUTF8 $ generateSignature sig]
+            ASourceFile f  -> [CUTF8 $ f]
+            _              -> []
 
 putAttr :: String -> Maybe Int -> ConstPool -> Attr -> Put
 putAttr debug mCodeSize cp attr = do
@@ -344,7 +344,8 @@ toAttrs cp code = [ACode maxStack' maxLocals' xs attrs']
         maxStack'          = CF.maxStack cf
         attrs              = if null frames then [] else [AStackMapTable frames]
         frames             = toStackMapFrames smt
-        attrs' = (if lnt == mempty then [] else [ALineNumberTable lnt]) ++ attrs
+        attrs'             = attrs ++ if lnt == mempty then []
+                                      else [ALineNumberTable lnt]
         
 toStackMapFrames :: StackMapTable -> [(Offset, StackMapFrame)]
 toStackMapFrames (StackMapTable smt)
