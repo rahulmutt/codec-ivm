@@ -16,7 +16,7 @@ mainClass :: Text
 mainClass = "Test"
 
 classFile :: ClassFile
-classFile = mkClassFile java7 [Public, Super] mainClass Nothing [] []
+classFile = mkClassFileWithAttrs java7 [Public, Super] mainClass Nothing [] [] [srcFile]
   [
     mkMethodDef mainClass [Public, Static] "main" [jarray jstring] void $
         startLabel loop
@@ -28,7 +28,8 @@ classFile = mkClassFile java7 [Public, Super] mainClass Nothing [] []
      <> ifeq (goto loop) mempty
      <> vreturn
   ]
-  where loop = mkLabel 1
+  where srcFile = mkSourceFileAttr "Main.hs" 
+        loop = mkLabel 1
         ln = mkLineNumber
 
 dumpStackMap :: Code -> IO ()
