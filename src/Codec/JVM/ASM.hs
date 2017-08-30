@@ -43,7 +43,7 @@ import qualified Data.Set as Set
 import qualified Data.Map.Strict as Map
 
 import Codec.JVM.ASM.Code (Code, vreturn, invokespecial, dup, gload)
-import Codec.JVM.Attr (attrName, innerClassInfo, unpackAttr, Attr(AInnerClasses))
+import Codec.JVM.Attr (attrName, innerClassInfo, unpackAttr, Attr(AInnerClasses,ASourceFile))
 import Codec.JVM.Class (ClassFile(..))
 import Codec.JVM.Const (Const(..))
 import Codec.JVM.ConstPool (unpackClassName)
@@ -61,8 +61,20 @@ mkClassFile :: Version
             -> [FieldDef]
             -> [MethodDef]
             -> ClassFile
-mkClassFile v afs tc' sc' is' fds mds = ClassFile cs v (Set.fromList afs) tc sc is fis mis attrs
-    where
+mkClassFile v afs tc' sc' is' fds mds = mkClassFileWithAttrs v afs tc' sc' is' fds [] mds
+  
+mkClassFileWithAttrs :: Version
+                     -> [AccessFlag]
+                     -> Text         -- class name
+                     -> Maybe Text   -- superclass, java/lang/Object is nothing
+                     -> [Text]       -- Interfaces
+                     -> [FieldDef]
+                     -> [Attr]
+                     -> [MethodDef]
+                     -> ClassFile
+mkClassFileWithAttrs v afs tc' sc' is' fds attrs' mds =
+  ClassFile cs v (Set.fromList afs) tc sc is fis mis attrs
+  where
       is = map IClassName is'
       tc = IClassName tc'
       sc = IClassName <$> sc'
@@ -74,9 +86,10 @@ mkClassFile v afs tc' sc' is' fds mds = ClassFile cs v (Set.fromList afs) tc sc 
         fdcs = fds >>= unpackFieldDef
         fics = fis >>= unpackFieldInfo
 
-      (cs'', attrs') = innerClassInfo cs'
-      acs = concatMap unpackAttr attrs'
-      attrs =  Map.fromList . map (\attr -> (attrName attr, attr)) $ attrs'
+      (cs'', innerAttrs) = innerClassInfo cs'
+      attrs'' = attrs' ++ innerAttrs
+      acs = concatMap unpackAttr attrs''
+      attrs =  Map.fromList . map (\attr -> (attrName attr, attr)) $ attrs''
       cs = cs'' ++ cs' ++ acs
       mis = f <$> mds where
         f (MethodDef afs' n' (MethodDesc d) code ats) =
@@ -159,3 +172,6 @@ addInnerClasses innerClasses
         mergeInnerClasses _ _ = error "Bad inner class attributes"
         (consts, maybeAttr) = innerClassInfo classConsts
         classConsts = map (\ClassFile {..} -> CClass thisClass) innerClasses
+
+mkSourceFileAttr :: Text -> Attr
+mkSourceFileAttr = ASourceFile
