@@ -21,14 +21,14 @@ classFile = mkClassFileWithAttrs java7 [Public, Super] mainClass Nothing [] [] [
     mkMethodDef mainClass [Public, Static] "main" [jarray jstring] void $
         startLabel loop
      <> markStackMap
-     <> emitLineNumber (ln 5)  
+     <> emitLineNumber (ln 5)
      <> iconst jint 1
      <> iconst jint 1
      <> iadd
      <> ifeq (goto loop) mempty
      <> vreturn
   ] (const False)
-  where srcFile = mkSourceFileAttr "Main.hs" 
+  where srcFile = mkSourceFileAttr "Main.hs"
         loop = mkLabel 1
         ln = mkLineNumber
 

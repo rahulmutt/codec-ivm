@@ -6,30 +6,34 @@
 --
 -- @
 -- {-# LANGUAGE OverloadedStrings #-}
--- import Data.Binary.Put (runPut)
--- import Data.Foldable (fold)
--- import qualified Data.ByteString.Lazy as BS
+-- module Main where
 --
--- import Codec.JVM.ASM (mkClassFile, mkMethodDef)
--- import Codec.JVM.ASM.Code
--- import Codec.JVM.Class (ClassFile, putClassFile)
--- import Codec.JVM.Method (AccessFlag(..))
--- import Codec.JVM.Types
+-- import Codec.JVM
+-- import Codec.JVM.ASM.Code.Instr
+-- import Codec.JVM.ConstPool
+-- import Data.Monoid((<>))
 --
--- mainClass :: ClassFile
--- mainClass = mkClassFile java8 [] "HelloWorld" Nothing
---   [ mkMethodDef [Public, Static] "main" [arr.obj $ "java/lang/String"] void $ fold
---     [ getstatic systemOut
---     , bipush jint 42
---     , invokevirtual printlnI
---     , vreturn ]
---   ]
---     where
---       systemOut   = mkFieldRef  "java/lang/System"    "out"     (obj "java/io/PrintStream")
---       printlnI    = mkMethodRef "java/io/PrintStream" "println" [prim JInt]                   void
+-- import Data.Text (Text)
+-- import qualified Data.ByteString as BS
 --
 -- main :: IO ()
--- main = BS.writeFile "HelloWorld.class" $ runPut . putClassFile $ mainClass
+-- main = BS.writeFile "HelloWorld.class" $ classFileBS classFile
+--
+-- mainClass :: Text
+-- mainClass = "HelloWorld"
+--
+-- classFile :: ClassFile
+-- classFile = mkClassFileWithAttrs java8 [Public, Super] mainClass Nothing [] [] [srcFile]
+--   [
+--     mkMethodDef mainClass [Public, Static] "main" [jarray jstring] void $
+--       getstatic systemOut
+--       <> bipush jint 42
+--       <> invokevirtual printlnI
+--       <> vreturn
+--   ] (const False)
+--   where srcFile = mkSourceFileAttr "Main.hs"
+--         systemOut   = mkFieldRef  "java/lang/System"    "out"     (obj "java/io/PrintStream")
+--         printlnI    = mkMethodRef "java/io/PrintStream" "println" [prim JInt] void
 -- @
 --
 module Codec.JVM.ASM where
@@ -62,7 +66,7 @@ mkClassFile :: Version
             -> [MethodDef]
             -> ClassFile
 mkClassFile v afs tc' sc' is' fds mds = mkClassFileWithAttrs v afs tc' sc' is' fds [] mds (const False)
-  
+
 mkClassFileWithAttrs :: Version
                      -> [AccessFlag]
                      -> Text         -- class name
@@ -92,12 +96,12 @@ mkClassFileWithAttrs v afs tc' sc' is' fds attrs' mds f =
       acs = concatMap unpackAttr attrs''
       attrs =  Map.fromList . map (\attr -> (attrName attr, attr)) $ attrs''
       cs = cs'' ++ cs' ++ acs
-      mis = f <$> mds where
-        f (MethodDef afs' n' (MethodDesc d) code ats) =
+      mis = f' <$> mds where
+        f' (MethodDef afs' n' (MethodDesc d) code ats) =
            MethodInfo (Set.fromList afs') n' (Desc d) code ats
 
-      fis = f <$> fds where
-        f (FieldDef afs' n' (FieldDesc d)) =
+      fis = f' <$> fds where
+        f' (FieldDef afs' n' (FieldDesc d)) =
           FieldInfo (Set.fromList afs') n' (Desc d) []
 
 data MethodDef = MethodDef {

@@ -2,7 +2,7 @@
 module Codec.JVM.Attr where
 
 import Data.Maybe (mapMaybe, fromMaybe)
-import Data.Monoid ((<>))
+import Data.Semigroup
 import Data.Map.Strict (Map)
 import Data.ByteString (ByteString)
 import Data.Foldable (traverse_)
@@ -29,6 +29,8 @@ import Codec.JVM.ConstPool (ConstPool, putIx, unpack)
 import Codec.JVM.Internal
 import Codec.JVM.Types (PrimType(..), IClassName(..),
                         AccessFlag(..), mkFieldDesc', putAccessFlags, prim)
+
+import Prelude
 
 type ParameterName = Text
 
@@ -214,17 +216,14 @@ newtype InnerClassMap = InnerClassMap (Map Text InnerClass)
 innerClassElems :: InnerClassMap -> [InnerClass]
 innerClassElems (InnerClassMap m) = Map.elems m
 
--- Left-biased monoid. Not commutative
-instance Monoid InnerClassMap where
-  mempty = InnerClassMap mempty
-  mappend (InnerClassMap x) (InnerClassMap y) =
-    InnerClassMap $ x `Map.union` y
-
-#if MIN_VERSION_base(4,10,0)
+-- Left-biased semigroup. Not commutative
 instance Semigroup InnerClassMap where
   (<>) (InnerClassMap x) (InnerClassMap y) =
     InnerClassMap $ x `Map.union` y
-#endif
+
+instance Monoid InnerClassMap where
+  mempty = InnerClassMap mempty
+  mappend = (<>)
 
 instance Show Attr where
   show (AInnerClasses icm) = "AInnerClasses = " ++ show icm

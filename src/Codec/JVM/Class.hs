@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, NamedFieldPuns #-}
 module Codec.JVM.Class where
 
 import Data.Binary.Get

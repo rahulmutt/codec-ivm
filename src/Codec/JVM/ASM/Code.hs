@@ -5,7 +5,7 @@ import Control.Monad.Reader
 import Data.Text (Text)
 import Data.ByteString (ByteString)
 import Data.Foldable (fold)
-import Data.Monoid ((<>))
+import Data.Semigroup
 import Data.Word (Word8, Word16)
 import Data.Int (Int32, Int64)
 
@@ -29,19 +29,19 @@ import qualified Data.IntMap.Strict as IntMap
 
 import Data.Maybe (maybeToList, catMaybes)
 
+import Prelude
+
 data Code = Code
   { consts  :: [Const]
   , instr   :: Instr }
   deriving Show
 
-instance Monoid Code where
-  mempty = Code mempty mempty
-  mappend (Code cs0 i0) (Code cs1 i1) = Code (mappend cs0 cs1) (mappend i0 i1)
-
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup Code where
   (<>) (Code cs0 i0) (Code cs1 i1) = Code ((<>) cs0 cs1) ((<>) i0 i1)
-#endif
+
+instance Monoid Code where
+  mempty = Code mempty mempty
+  mappend = (<>)
 
 mkCode :: [Const] -> Instr -> Code
 mkCode = Code
@@ -548,9 +548,9 @@ gldc ft c = mkCode cs $ loadCode
 gconv :: FieldType -> FieldType -> Code
 gconv ft1 ft2
   | Just opCode <- convOpcode
-  = mkCode (cs ft2) $ opCode <> mod
+  = mkCode (cs ft2) $ opCode <> modify
   | otherwise = mempty
-  where mod = modifyStack (CF.push ft2 . CF.pop ft1)
+  where modify = modifyStack (CF.push ft2 . CF.pop ft1)
         convOpcode = case (ft1, ft2) of
           (BaseType bt1, BaseType bt2) ->
             case (bt1, bt2) of

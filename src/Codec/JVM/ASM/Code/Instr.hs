@@ -1,16 +1,18 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, CPP, UnboxedTuples, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, NamedFieldPuns, MagicHash, OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, CPP, UnboxedTuples, RecordWildCards, MultiParamTypeClasses, FlexibleContexts, NamedFieldPuns, MagicHash #-}
 module Codec.JVM.ASM.Code.Instr where
 
 import Control.Monad.IO.Class
+import Control.Monad.Fail
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.ByteString (ByteString)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.Maybe(fromMaybe)
 import Data.List(sortBy)
 import Data.Int(Int32)
 import Data.Ord(comparing)
+import Data.Semigroup
+
 import GHC.Base
 
 import qualified Data.ByteString as BS
@@ -28,6 +30,8 @@ import qualified Codec.JVM.Types as T
 import qualified Codec.JVM.ASM.Code.CtrlFlow as CF
 import qualified Codec.JVM.ConstPool as CP
 import qualified Codec.JVM.Opcode as OP
+
+import Prelude
 
 data InstrState =
   InstrState { isByteCode        :: !ByteString
@@ -49,17 +53,20 @@ instance Functor InstrM where
   fmap = liftM
 
 instance Applicative InstrM where
-  pure = return
+  pure x = InstrM $ \_ s -> (# x, s #)
   (<*>) = ap
 
 instance Monad InstrM where
-  return x = InstrM $ \_ s -> (# x, s #)
+  return = pure
   (InstrM m) >>= f =
     InstrM $ \e s ->
       case m e s of
         (# x, s' #) ->
           case runInstrM (f x) e s' of
             (# x', s'' #) -> (# x', s'' #)
+
+instance MonadFail InstrM where
+  fail = error
 
 instance MonadIO InstrM where
   liftIO (IO io) = InstrM $ \_ s ->
@@ -74,18 +81,14 @@ instance MonadReader ConstPool InstrM where
   ask = InstrM $ \e s -> (# e, s #)
   local f (InstrM m) = InstrM $ \e s -> m (f e) s
 
-instance Monoid Instr where
-  mempty = Instr $ return ()
-  mappend (Instr rws0) (Instr rws1) = Instr $ do
-    rws0
-    rws1
-
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup Instr where
   (<>) (Instr rws0) (Instr rws1) = Instr $ do
     rws0
     rws1
-#endif
+
+instance Monoid Instr where
+  mempty = Instr $ return ()
+  mappend = (<>)
 
 instance Show Instr where
   show _ = "Instructions"
@@ -478,11 +481,11 @@ updateRunAgain = (||)
 
 toETEs :: ExceptionTable -> LabelTable -> [ExceptionTableEntry]
 toETEs et lt =
-  map (\(start, end, handler, const) ->
+  map (\(start, end, handler, constant) ->
          ExceptionTableEntry { eteStartPc   = unOffset $ lookupLT start   lt
                              , eteEndPc     = unOffset $ lookupLT end     lt
                              , eteHandlerPc = unOffset $ lookupLT handler lt
-                             , eteCatchType = fmap (CClass . IClassName) const })
+                             , eteCatchType = fmap (CClass . IClassName) constant })
   $ toListET et
 
 data ExceptionTableEntry
@@ -549,7 +552,7 @@ synchronized (storeCode, loadCode, throwCode, monEnter, monExit) syncCode = Inst
   resetLastBranch $ fromMaybe lb (selectLatestLB mtryLB mfinallyLB)
 
 throwable :: Text
-throwable = "java/lang/Throwable"
+throwable = pack "java/lang/Throwable"
 
 jthrowable :: FieldType
 jthrowable = T.obj throwable
