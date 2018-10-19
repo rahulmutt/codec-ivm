@@ -2,7 +2,7 @@
 module Codec.JVM.ASM.Code.Instr where
 
 import Control.Monad.IO.Class
-import Control.Monad.Fail
+import qualified Control.Monad.Fail as Fail
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.ByteString (ByteString)
@@ -65,7 +65,9 @@ instance Monad InstrM where
           case runInstrM (f x) e s' of
             (# x', s'' #) -> (# x', s'' #)
 
-instance MonadFail InstrM where
+  fail = Fail.fail
+
+instance Fail.MonadFail InstrM where
   fail = error
 
 instance MonadIO InstrM where
