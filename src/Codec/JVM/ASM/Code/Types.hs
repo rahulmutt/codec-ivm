@@ -3,9 +3,12 @@ module Codec.JVM.ASM.Code.Types where
 
 import Codec.JVM.ASM.Code.CtrlFlow (CtrlFlow)
 
+import Data.Semigroup
 import Data.Text (Text)
 import Data.IntMap.Strict (IntMap)
 import qualified Data.IntMap.Strict as IntMap
+
+import Prelude
 
 newtype Label = Label Int
   deriving Show
@@ -23,17 +26,14 @@ newtype StackMapTable = StackMapTable (IntMap CtrlFlow)
 union' :: IntMap a -> IntMap a -> IntMap a
 union' = IntMap.unionWith (flip const)
 
--- TODO: Implement a strict fold for mconcat
-instance Monoid StackMapTable where
-  mempty = StackMapTable mempty
-  mappend (StackMapTable x) (StackMapTable y)
-    = StackMapTable $ union' x y
-
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup StackMapTable where
   (<>) (StackMapTable x) (StackMapTable y)
     = StackMapTable $ union' x y
-#endif
+
+-- TODO: Implement a strict fold for mconcat
+instance Monoid StackMapTable where
+  mempty = StackMapTable mempty
+  mappend = (<>)
 
 insertSMT :: Int -> CtrlFlow -> StackMapTable -> StackMapTable
 insertSMT k v (StackMapTable sm) = StackMapTable $ IntMap.insert k v sm
@@ -47,16 +47,13 @@ mkLineNumber = LineNumber
 newtype LineNumberTable = LineNumberTable (IntMap LineNumber)
   deriving (Show, Eq)
 
-instance Monoid LineNumberTable where
-  mempty = LineNumberTable mempty
-  mappend (LineNumberTable x) (LineNumberTable y)
-    = LineNumberTable $ union' x y
-
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup LineNumberTable where
   (<>) (LineNumberTable x) (LineNumberTable y)
     = LineNumberTable $ union' x y
-#endif
+
+instance Monoid LineNumberTable where
+  mempty = LineNumberTable mempty
+  mappend = (<>)
 
 toListLNT :: LineNumberTable -> [(Offset,LineNumber)]
 toListLNT (LineNumberTable m) = map (\(off,ln) -> (Offset off,ln)) $ IntMap.assocs m
@@ -68,16 +65,13 @@ insertLNT (Offset off) ln (LineNumberTable lnt) =
 newtype LabelTable = LabelTable { unLabelTable :: IntMap Offset }
   deriving Show
 
-instance Monoid LabelTable where
-  mempty = LabelTable mempty
-  mappend (LabelTable x) (LabelTable y)
-    = LabelTable $ union' x y
-
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup LabelTable where
   (<>) (LabelTable x) (LabelTable y)
     = LabelTable $ union' x y
-#endif
+
+instance Monoid LabelTable where
+  mempty = LabelTable mempty
+  mappend = (<>)
 
 toLT :: [(Label, Offset)] -> LabelTable
 toLT labels = LabelTable $ IntMap.fromList labels'
@@ -118,19 +112,17 @@ foldlStrict f = go
 
 newtype ExceptionTable = ExceptionTable [(Label, Label, Label, Maybe Text)]
 
-instance Monoid ExceptionTable where
-  mempty = ExceptionTable mempty
-  mappend (ExceptionTable x) (ExceptionTable y)
-    = ExceptionTable $ x ++ y
-#if MIN_VERSION_base(4,10,0)
 instance Semigroup ExceptionTable where
   (<>) (ExceptionTable x) (ExceptionTable y)
     = ExceptionTable $ x ++ y
-#endif
+
+instance Monoid ExceptionTable where
+  mempty = ExceptionTable mempty
+  mappend = (<>)
 
 insertIntoET :: Label -> Label -> Label -> Maybe Text -> ExceptionTable -> ExceptionTable
-insertIntoET start end handler const (ExceptionTable etes) =
-  ExceptionTable $ (start, end, handler, const) : etes
+insertIntoET start end handler constant (ExceptionTable etes) =
+  ExceptionTable $ (start, end, handler, constant) : etes
 
 toListET :: ExceptionTable -> [(Label, Label, Label, Maybe Text)]
 toListET (ExceptionTable etes) = reverse etes

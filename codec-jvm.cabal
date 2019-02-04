@@ -32,6 +32,11 @@ library
     Codec.JVM.Method
     Codec.JVM.Opcode
     Codec.JVM.Types
+
+  -- See https://ghc.haskell.org/trac/ghc/wiki/Migration/8.0#base-4.9.0.0
+  if impl(ghc >= 8.0)
+    ghc-options:  -Wno-redundant-constraints -Wcompat -Wnoncanonical-monad-instances -Wnoncanonical-monadfail-instances
+
   build-depends:
       base                >= 4.6.0.1    && < 5
     , binary              >= 0.7        && < 0.9
@@ -42,8 +47,10 @@ library
     , mtl
     , array
     , transformers
-  default-extensions: NamedFieldPuns
 
+  if !impl(ghc >= 8)
+    build-depends:     semigroups                      >= 0.10 && < 0.19
+                     , fail == 4.9.*
 
 executable example
     hs-source-dirs:      example
